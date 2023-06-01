@@ -107,9 +107,9 @@ find_package(catkin REQUIRED COMPONENTS
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-  INCLUDE_DIRS include
+  # INCLUDE_DIRS include
 #  LIBRARIES centralised_auction
-  CATKIN_DEPENDS nav_msgs std_msgs waypoint_follower_msgs task_msgs
+  CATKIN_DEPENDS roscpp nav_msgs std_msgs waypoint_follower_msgs task_msgs
 #  DEPENDS system_lib
 )
 
@@ -128,10 +128,10 @@ include_directories(
 #add_library(centralised_auction_node src/centralised_auction_node.cpp)
 add_library(sequential_auction src/sequential_auction.cpp)
 
-## Add cmake target dependencies of the library
-## as an example, code may need to be generated before libraries
-## either from message generation or dynamic reconfigure
-# add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+# Add cmake target dependencies of the library
+# as an example, code may need to be generated before libraries
+# either from message generation or dynamic reconfigure
+add_dependencies(sequential_auction ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
@@ -166,7 +166,7 @@ target_link_libraries(centralised_auction_node sequential_auction ${catkin_LIBRA
 # )
 
 ## Mark executables and/or libraries for installation
-install(TARGETS 
+install(TARGETS
   centralised_auction_node
   sequential_auction
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
@@ -175,11 +175,11 @@ install(TARGETS
 )
 
 ## Mark cpp header files for installation
-install(DIRECTORY include/${PROJECT_NAME}/
-  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-  FILES_MATCHING PATTERN "*.h"
-  PATTERN ".svn" EXCLUDE
-)
+# install(DIRECTORY include/${PROJECT_NAME}/
+#   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+#   FILES_MATCHING PATTERN "*.h"
+#   PATTERN ".svn" EXCLUDE
+# )
 
 ## Mark other files for installation (e.g. launch and bag files, etc.)
 # install(FILES
