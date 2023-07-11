@@ -1,3 +1,4 @@
+#include <cmath>
 #include "centralised_auction/sequential_auction.h"
 
 /********************************************
@@ -105,7 +106,14 @@ void SequentialAuction::calculateBids(int robot_num)
         ROS_DEBUG("Robot %i cannot do task %i; skipping bid.", robot_num, task_num);
         continue;
       }
+
+      if (!paths[robot_num].empty())
+      {
+        ROS_DEBUG("Robot %i has already been assigned a task; skipping bid.", robot_num);
+        continue;
+      }
     }
+
     // cout << "task " << unalloc[i] << endl;
     // Get the current path cost.
     double prev_cost = path_costs[robot_num];
@@ -243,28 +251,34 @@ double SequentialAuction::insertTask(int robot_num, int unalloc_id, vector<int>&
 double SequentialAuction::calculatePathCost(int robot_num, vector<int> path)
 {
   double dist = 0;
-  double x_prev, y_prev, x_next, y_next, x_diff, y_diff;
+  double x_prev, y_prev, z_prev, x_next, y_next, z_next, x_diff, y_diff, z_diff;
   int task_id;
   x_prev = robot_poses[robot_num].position.x;
   y_prev = robot_poses[robot_num].position.y;
+  z_prev = robot_poses[robot_num].position.z;
   for (int i = 0; i < path.size(); i++)
   {
     task_id = path[i];
     x_next = tasks[task_id].pose.position.x;
     y_next = tasks[task_id].pose.position.y;
+    z_next = tasks[task_id].pose.position.z;
     x_diff = x_next - x_prev;
     y_diff = y_next - y_prev;
-    dist += sqrt(x_diff * x_diff + y_diff * y_diff);
+    z_diff = z_next - z_prev;
+    dist += std::hypot(x_diff, y_diff, z_diff);
     x_prev = x_next;
     y_prev = y_next;
+    z_prev = z_next;
   }
   if (return_home)
   {
     x_next = robot_poses[robot_num].position.x;
     y_next = robot_poses[robot_num].position.y;
+    z_next = robot_poses[robot_num].position.z;
     x_diff = x_next - x_prev;
     y_diff = y_next - y_prev;
-    dist += sqrt(x_diff * x_diff + y_diff * y_diff);
+    z_diff = z_next - z_prev;
+    dist += std::hypot(x_diff, y_diff, z_diff);
   }
   return dist;
 }
