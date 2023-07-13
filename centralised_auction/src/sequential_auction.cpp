@@ -103,13 +103,8 @@ void SequentialAuction::calculateBids(int robot_num)
       bool current_robot_can_do_current_task = feasible_tasks.at(robot_num).count(task_num);
       if (!current_robot_can_do_current_task)
       {
-        ROS_DEBUG("Robot %i cannot do task %i; skipping bid.", robot_num, task_num);
-        continue;
-      }
-
-      if (!paths[robot_num].empty())
-      {
-        ROS_DEBUG("Robot %i has already been assigned a task; skipping bid.", robot_num);
+        ROS_DEBUG("Robot %i cannot do task %i; Bidding invalid amount.", robot_num, task_num);
+        bids[robot_num][task_num] = -1;
         continue;
       }
     }
@@ -185,6 +180,16 @@ void SequentialAuction::selectWinner(int& winning_robot, int& winning_task)
 void SequentialAuction::processWinner(int winning_robot, int winning_task)
 {
   insertTask(winning_robot, winning_task, paths[winning_robot]);
+  if (!feasible_tasks.empty())
+  {
+    // For now, treat each robot (end effector) as being able to carry out a single task (waypoint trajectory).
+    // As such, clear out its feasible tasks.
+    // TODO: Generalize to something more sophisticated like
+    // selectively removing only tasks which are mutually exclusive with the winning_task.
+    ROS_INFO("Clearing feasible tasks for robot %i after winning task %i.", winning_robot, winning_task);
+    //
+    feasible_tasks.at(winning_robot).clear();
+  }
   for (int i = 0; i < num_robots; i++)
   {
     bids[i][winning_task] = -1;
