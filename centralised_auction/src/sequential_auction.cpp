@@ -1,3 +1,4 @@
+#include <cmath>
 #include "centralised_auction/sequential_auction.h"
 
 /********************************************
@@ -5,12 +6,24 @@
  ********************************************/
 
 // Constructor.
-SequentialAuction::SequentialAuction(vector<Task> unallocated_tasks, vector<Pose> robot_poses)
+SequentialAuction::SequentialAuction(vector<Task> unallocated_tasks, vector<Pose> robot_poses,
+                                     vector<set<int>> feasible_tasks)
 {
   this->tasks = unallocated_tasks;
   this->num_tasks = unallocated_tasks.size();
   this->robot_poses = robot_poses;
   this->num_robots = robot_poses.size();
+  this->feasible_tasks = feasible_tasks;
+  if (feasible_tasks.empty())
+  {
+    ROS_INFO("Feasible task set not provided. Assuming all tasks are feasible for all robots.");
+  }
+  else
+  {
+    ROS_ASSERT_MSG(robot_poses.size() == feasible_tasks.size(),
+                   "%zu feasible task sets were provided. Expected %zu, one for each robot.", feasible_tasks.size(),
+                   robot_poses.size());
+  }
   return_home = false;
   use_least_contested_bid = false;
 }
@@ -84,14 +97,26 @@ void SequentialAuction::calculateBids(int robot_num)
 {
   for (int i = 0; i < unalloc.size(); i++)
   {
+    int task_num = unalloc[i];
+    if (!feasible_tasks.empty())
+    {
+      bool current_robot_can_do_current_task = feasible_tasks.at(robot_num).count(task_num);
+      if (!current_robot_can_do_current_task)
+      {
+        ROS_DEBUG("Robot %i cannot do task %i; Bidding invalid amount.", robot_num, task_num);
+        bids[robot_num][task_num] = -1;
+        continue;
+      }
+    }
+
     // cout << "task " << unalloc[i] << endl;
     // Get the current path cost.
     double prev_cost = path_costs[robot_num];
     // Calculate the new path cost if we were to add the task to the path.
     vector<int> new_path;
-    double new_cost = insertTask(robot_num, unalloc[i], new_path);
+    double new_cost = insertTask(robot_num, task_num, new_path);
     // Bid the new path cost.
-    bids[robot_num][unalloc[i]] = new_cost;
+    bids[robot_num][task_num] = new_cost;
   }
 }
 
@@ -155,6 +180,16 @@ void SequentialAuction::selectWinner(int& winning_robot, int& winning_task)
 void SequentialAuction::processWinner(int winning_robot, int winning_task)
 {
   insertTask(winning_robot, winning_task, paths[winning_robot]);
+  if (!feasible_tasks.empty())
+  {
+    // For now, treat each robot (end effector) as being able to carry out a single task (waypoint trajectory).
+    // As such, clear out its feasible tasks.
+    // TODO: Generalize to something more sophisticated like
+    // selectively removing only tasks which are mutually exclusive with the winning_task.
+    ROS_INFO("Clearing feasible tasks for robot %i after winning task %i.", winning_robot, winning_task);
+    //
+    feasible_tasks.at(winning_robot).clear();
+  }
   for (int i = 0; i < num_robots; i++)
   {
     bids[i][winning_task] = -1;
@@ -221,28 +256,34 @@ double SequentialAuction::insertTask(int robot_num, int unalloc_id, vector<int>&
 double SequentialAuction::calculatePathCost(int robot_num, vector<int> path)
 {
   double dist = 0;
-  double x_prev, y_prev, x_next, y_next, x_diff, y_diff;
+  double x_prev, y_prev, z_prev, x_next, y_next, z_next, x_diff, y_diff, z_diff;
   int task_id;
   x_prev = robot_poses[robot_num].position.x;
   y_prev = robot_poses[robot_num].position.y;
+  z_prev = robot_poses[robot_num].position.z;
   for (int i = 0; i < path.size(); i++)
   {
     task_id = path[i];
     x_next = tasks[task_id].pose.position.x;
     y_next = tasks[task_id].pose.position.y;
+    z_next = tasks[task_id].pose.position.z;
     x_diff = x_next - x_prev;
     y_diff = y_next - y_prev;
-    dist += sqrt(x_diff * x_diff + y_diff * y_diff);
+    z_diff = z_next - z_prev;
+    dist += std::hypot(x_diff, y_diff, z_diff);
     x_prev = x_next;
     y_prev = y_next;
+    z_prev = z_next;
   }
   if (return_home)
   {
     x_next = robot_poses[robot_num].position.x;
     y_next = robot_poses[robot_num].position.y;
+    z_next = robot_poses[robot_num].position.z;
     x_diff = x_next - x_prev;
     y_diff = y_next - y_prev;
-    dist += sqrt(x_diff * x_diff + y_diff * y_diff);
+    z_diff = z_next - z_prev;
+    dist += std::hypot(x_diff, y_diff, z_diff);
   }
   return dist;
 }

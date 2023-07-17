@@ -3,6 +3,7 @@
 
 #include <ros/ros.h>
 #include <ros/console.h>
+#include <set>
 #include <vector>
 #include "task_msgs/Task.h"
 #include "task_msgs/TaskArray.h"
@@ -11,6 +12,7 @@
 using geometry_msgs::Pose;
 using std::cout;
 using std::endl;
+using std::set;
 using std::vector;
 using task_msgs::Task;
 using task_msgs::TaskArray;
@@ -21,9 +23,9 @@ public:
   bool use_least_contested_bid;
   bool return_home;
 
-  SequentialAuction(vector<Task> unallocated_tasks, vector<Pose> robot_poses);
+  SequentialAuction(vector<Task> unallocated_tasks, vector<Pose> robot_poses, vector<set<int>> feasible_tasks = {});
   vector<TaskArray> allocateTasks();
-  vector<vector<int> > getPaths() const
+  vector<vector<int>> getPaths() const
   {
     return paths;
   }
@@ -34,11 +36,12 @@ private:
   int num_tasks;
   vector<Pose> robot_poses;
   vector<Task> tasks;
+  vector<set<int>> feasible_tasks;
   // Working variables for alloction.
   vector<int> unalloc;
-  vector<vector<int> > paths;  // consider changing to lists for efficiency
+  vector<vector<int>> paths;  // consider changing to lists for efficiency
   vector<double> path_costs;
-  vector<vector<double> > bids;
+  vector<vector<double>> bids;
 
   // Output variable from allocation.
   vector<TaskArray> allocations;
