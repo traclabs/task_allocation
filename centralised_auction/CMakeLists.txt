@@ -10,9 +10,6 @@ add_compile_options(-std=c++17)
 find_package(catkin REQUIRED COMPONENTS
   nav_msgs
   std_msgs
-  waypoint_follower
-  waypoint_follower_msgs
-  # multi_jackal_tutorials
   roscpp
   task_msgs
 )
@@ -109,7 +106,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME}
-  CATKIN_DEPENDS roscpp nav_msgs std_msgs waypoint_follower_msgs task_msgs
+  CATKIN_DEPENDS roscpp nav_msgs std_msgs task_msgs
 #  DEPENDS system_lib
 )
 
@@ -125,7 +122,6 @@ include_directories(
 )
 
 ## Declare a C++ library
-#add_library(centralised_auction_node src/centralised_auction_node.cpp)
 add_library(${PROJECT_NAME} src/sequential_auction.cpp)
 
 # Add cmake target dependencies of the library
@@ -137,7 +133,7 @@ add_dependencies(${PROJECT_NAME} ${catkin_EXPORTED_TARGETS})
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-add_executable(${PROJECT_NAME}_node src/centralised_auction_node.cpp)
+# add_executable(${PROJECT_NAME}_node src/${PROJECT_NAME}_node.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -147,10 +143,10 @@ add_executable(${PROJECT_NAME}_node src/centralised_auction_node.cpp)
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
-add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+# add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME} ${catkin_LIBRARIES})
+# target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME} ${catkin_LIBRARIES})
 
 #############
 ## Install ##
@@ -168,7 +164,7 @@ target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME} ${catkin_LIBRARIES})
 
 ## Mark executables and/or libraries for installation
 install(TARGETS
-  ${PROJECT_NAME}_node
+  # ${PROJECT_NAME}_node
   ${PROJECT_NAME}
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
