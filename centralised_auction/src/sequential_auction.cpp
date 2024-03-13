@@ -1,4 +1,5 @@
 #include <cmath>
+#include <sstream>
 #include "centralised_auction/sequential_auction.h"
 
 /********************************************
@@ -186,7 +187,7 @@ void SequentialAuction::processWinner(int winning_robot, int winning_task)
     // As such, clear out its feasible tasks.
     // TODO: Generalize to something more sophisticated like
     // selectively removing only tasks which are mutually exclusive with the winning_task.
-    ROS_INFO("Clearing feasible tasks for robot %i after winning task %i.", winning_robot, winning_task);
+    ROS_DEBUG("Clearing feasible tasks for robot %i after winning task %i.", winning_robot, winning_task);
     //
     feasible_tasks.at(winning_robot).clear();
   }
@@ -301,22 +302,27 @@ void SequentialAuction::printPaths()
 
 void SequentialAuction::printPath(vector<int> path)
 {
-  cout << "[ ";
+  std::stringstream ss;
+  ss << "[ ";
   for (int i = 0; i < path.size(); i++)
   {
-    cout << path[i] << " ";
+    ss << path[i] << " ";
   }
-  cout << "]" << endl;
+  ss << "]";
+  ROS_DEBUG_STREAM(ss.str());
 }
 
 void SequentialAuction::printBids()
 {
+  std::stringstream ss;
+  ss << std::setw(8) << std::setprecision(1) << std::fixed;
   for (int i = 0; i < num_robots; i++)
   {
     for (int j = 0; j < num_tasks; j++)
     {
-      printf("% 6.1f ", bids[i][j]);
+      ss << bids[i][j] << " ";
     }
     cout << endl;
   }
+  ROS_DEBUG_STREAM(ss.str());
 }
