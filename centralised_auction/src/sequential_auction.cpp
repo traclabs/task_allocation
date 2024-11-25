@@ -26,7 +26,7 @@ SequentialAuction::SequentialAuction(vector<Task> unallocated_tasks, vector<Pose
                    robot_poses.size());
   }
   return_home = false;
-  use_least_contested_bid = false;
+  use_least_contested_bid = true;
 }
 
 // The allocation procedure. Each iteration, selects a winner to allocate and
@@ -38,10 +38,10 @@ vector<TaskArray> SequentialAuction::allocateTasks()
   calculateAllBids();
   while (!unalloc.empty())
   {
-    // cout << "The bids are: " << endl;
-    // printBids();
+    cout << "The bids are: " << endl;
+    printBids();
     selectWinner(winning_robot, winning_task);
-    // cout << "winner is: " << winning_robot << ", " << winning_task << endl;
+    cout << "winner is: " << winning_robot << ", " << winning_task << endl;
     processWinner(winning_robot, winning_task);
     calculateBids(winning_robot);
   }
@@ -124,14 +124,25 @@ void SequentialAuction::calculateBids(int robot_num)
 // Selects the winning robot and task by the minimum non-negative bid.
 void SequentialAuction::selectWinner(int& winning_robot, int& winning_task)
 {
+  winning_robot = -1;
+  winning_task = -1;
+
   // Option - winner is the least contested bid.
   if (use_least_contested_bid && num_robots > 1)
   {
     double max_bid_diff, min_bid, min_bid2, bid_diff, bid;
     int temp_winning_robot = -1;
     max_bid_diff = -1;
+    double min_uncontested_bid = -1;
     for (int j = 0; j < num_tasks; j++)
     {
+      // Check if the unalloc vector contains task j.
+      if (std::find(unalloc.begin(), unalloc.end(), j) == unalloc.end())
+      {
+        ROS_DEBUG("Task %i is already allocated.", j);
+        continue;
+      }
+
       min_bid = -1;
       min_bid2 = -1;
       for (int i = 0; i < num_robots; i++)
@@ -149,31 +160,52 @@ void SequentialAuction::selectWinner(int& winning_robot, int& winning_task)
           min_bid2 = bid;
         }
       }
+      if (min_bid == -1) {
+        ROS_WARN("No valid bids for task %i. Skipping this task, but will keep searching for a winner among remaining tasks.", j);
+        continue;
+      }
+
+      if (min_bid2 == -1) {
+        ROS_DEBUG("Task %i has only one valid bid from robot %i.", j, temp_winning_robot);
+        if (min_uncontested_bid == -1 || min_bid < min_uncontested_bid) {
+          ROS_DEBUG("No other uncontested tasks found, or this uncontested task (%i) has a lower bid (%.1f) than the previous uncontested task (%i: %.1f).",
+                     j, min_bid, winning_task, min_uncontested_bid);
+          min_uncontested_bid = min_bid;
+          winning_robot = temp_winning_robot;
+          winning_task = j;
+        }
+        continue;
+      }
+
       bid_diff = min_bid2 - min_bid;
       if (bid_diff > max_bid_diff)
       {
+        ROS_DEBUG("No uncontested tasks, and task %i robot %i has a higher bid difference (%.1f) than the previously found.",
+          j, temp_winning_robot, bid_diff);
         max_bid_diff = bid_diff;
         winning_task = j;
         winning_robot = temp_winning_robot;
       }
     }
-    return;
-  }
-  // Option (default) - winner is the lowest bid.
-  double min_bid = -1;
-  for (int i = 0; i < num_robots; i++)
-  {
-    for (int j = 0; j < num_tasks; j++)
+  } else {
+    // Option (default) - winner is the lowest bid.
+    double min_bid = -1;
+    for (int i = 0; i < num_robots; i++)
     {
-      double bid = bids[i][j];
-      if ((bid < min_bid || min_bid == -1) && bid >= 0)
+      for (int j = 0; j < num_tasks; j++)
       {
-        min_bid = bid;
-        winning_robot = i;
-        winning_task = j;
+        double bid = bids[i][j];
+        if ((bid < min_bid || min_bid == -1) && bid >= 0)
+        {
+          min_bid = bid;
+          winning_robot = i;
+          winning_task = j;
+        }
       }
     }
   }
+
+  ROS_FATAL_COND(winning_robot == -1 || winning_task == -1, "No winner found.");
 }
 
 // Adds the winning task to the winning robots path, and removes the task from
@@ -315,14 +347,15 @@ void SequentialAuction::printPath(vector<int> path)
 void SequentialAuction::printBids()
 {
   std::stringstream ss;
-  ss << std::setw(8) << std::setprecision(1) << std::fixed;
+  ss << std::setprecision(1) << std::fixed;
   for (int i = 0; i < num_robots; i++)
   {
     for (int j = 0; j < num_tasks; j++)
     {
-      ss << bids[i][j] << " ";
+      ss << std::setw(10) << bids[i][j] << " ";
     }
-    cout << endl;
+    ss << endl;
   }
   ROS_DEBUG_STREAM(ss.str());
+  cout << ss.str();
 }
