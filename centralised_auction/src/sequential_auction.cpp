@@ -2,6 +2,8 @@
 #include <sstream>
 #include "centralised_auction/sequential_auction.h"
 
+static bool isTaskLessContentious(double min_bid, double bid_diff, double winning_bid, double winning_bid_diff);
+
 /********************************************
  * Public functions (high level).
  ********************************************/
@@ -26,7 +28,7 @@ SequentialAuction::SequentialAuction(vector<Task> unallocated_tasks, vector<Pose
                    robot_poses.size());
   }
   return_home = false;
-  use_least_contested_bid = false;
+  use_least_contested_bid = true;
 }
 
 // The allocation procedure. Each iteration, selects a winner to allocate and
@@ -38,10 +40,10 @@ vector<TaskArray> SequentialAuction::allocateTasks()
   calculateAllBids();
   while (!unalloc.empty())
   {
-    // cout << "The bids are: " << endl;
-    // printBids();
+    cout << "The bids are: " << endl;
+    printBids();
     selectWinner(winning_robot, winning_task);
-    // cout << "winner is: " << winning_robot << ", " << winning_task << endl;
+    cout << "winner is: " << winning_robot << ", " << winning_task << endl;
     processWinner(winning_robot, winning_task);
     calculateBids(winning_robot);
   }
@@ -124,56 +126,118 @@ void SequentialAuction::calculateBids(int robot_num)
 // Selects the winning robot and task by the minimum non-negative bid.
 void SequentialAuction::selectWinner(int& winning_robot, int& winning_task)
 {
+  winning_robot = -1;
+  winning_task = -1;
+
   // Option - winner is the least contested bid.
   if (use_least_contested_bid && num_robots > 1)
   {
-    double max_bid_diff, min_bid, min_bid2, bid_diff, bid;
-    int temp_winning_robot = -1;
-    max_bid_diff = -1;
-    for (int j = 0; j < num_tasks; j++)
+    selectLeastContestedWinner(winning_robot, winning_task);
+  } else {
+    // Option (default) - winner is the lowest bid.
+    double min_bid = -1;
+    for (int i = 0; i < num_robots; i++)
     {
-      min_bid = -1;
-      min_bid2 = -1;
-      for (int i = 0; i < num_robots; i++)
+      for (int j = 0; j < num_tasks; j++)
       {
-        bid = bids[i][j];
+        double bid = bids[i][j];
         if ((bid < min_bid || min_bid == -1) && bid >= 0)
         {
-          min_bid2 = min_bid;
           min_bid = bid;
-          temp_winning_robot = i;
-          continue;
+          winning_robot = i;
+          winning_task = j;
         }
-        if ((bid < min_bid2 || min_bid2 == -1) && bid >= 0)
-        {
-          min_bid2 = bid;
-        }
-      }
-      bid_diff = min_bid2 - min_bid;
-      if (bid_diff > max_bid_diff)
-      {
-        max_bid_diff = bid_diff;
-        winning_task = j;
-        winning_robot = temp_winning_robot;
       }
     }
-    return;
   }
-  // Option (default) - winner is the lowest bid.
-  double min_bid = -1;
-  for (int i = 0; i < num_robots; i++)
-  {
-    for (int j = 0; j < num_tasks; j++)
-    {
-      double bid = bids[i][j];
-      if ((bid < min_bid || min_bid == -1) && bid >= 0)
-      {
+
+  ROS_FATAL_COND(winning_robot == -1 || winning_task == -1, "No winner found.");
+}
+
+void SequentialAuction::selectLeastContestedWinner(int& winning_robot, int& winning_task)
+{
+  static constexpr double INF = std::numeric_limits<double>::infinity();
+
+  ROS_ASSERT(winning_robot == -1);
+  ROS_ASSERT(winning_task == -1);
+  ROS_ASSERT(use_least_contested_bid);
+
+  double winning_bid = INF;
+  double winning_bid_diff = 0;
+
+  for (int task : unalloc) {
+    // For the current task, figure out which robot would win the task, with what bid, and by how much vs next lowest bid.
+    int task_winning_robot = -1;
+    double min_bid = INF;
+    // The most contentious bid is the closest bid to the minimum bid; ie the second lowest bid.
+    double most_contentious_bid = INF;
+
+    // Look through the robots to find the one that wins this task.
+    for (int robot = 0; robot < num_robots; robot++) {
+      bool current_robot_can_do_current_task = feasible_tasks.empty() || feasible_tasks.at(robot).count(task);
+      if (!current_robot_can_do_current_task) {
+        continue;
+      }
+
+      double bid = bids[robot][task];
+      if ( bid == -1 ) {
+        continue;
+      }
+
+      ROS_ASSERT( bid >= 0 );
+      ROS_ASSERT( bid < INF );
+
+      if (bid < min_bid) {
+        most_contentious_bid = min_bid;
         min_bid = bid;
-        winning_robot = i;
-        winning_task = j;
+        task_winning_robot = robot;
+      } else if (bid < most_contentious_bid) {
+        most_contentious_bid = bid;
       }
     }
+
+    // Now, decide if this task is the new (temporary) winner.
+    // 1. if current and winning tasks are both contested, pick the one with the least contention.
+    //    ie, the biggest difference between the winning bid and the next lowest bid.
+    // 2. if current and winning tasks are both uncontested, pick the one with the lowest bid.
+    // 3. Otherwise, pick the uncontested task over the contested one.
+
+    // 0. Reject the task if it has no valid bids.
+    if ( min_bid == INF || task_winning_robot == -1 ) {
+      ROS_WARN("Task %i has no valid bids.", task);
+      continue;
+    }
+
+    double bid_diff = most_contentious_bid - min_bid; // INF for uncontested tasks.
+    if (isTaskLessContentious(min_bid, bid_diff, winning_bid, winning_bid_diff)) {
+      ROS_ASSERT(bid_diff >= winning_bid_diff);
+      winning_robot = task_winning_robot;
+      winning_task = task;
+      winning_bid = min_bid;
+      winning_bid_diff = bid_diff;
+    }
   }
+}
+
+static bool isTaskLessContentious(double min_bid, double bid_diff, double winning_bid, double winning_bid_diff) {
+  if (bid_diff < winning_bid_diff) {
+    // Either the winning task is uncontested (infinite winning_bid_diff) and the current task is contested (finite bid_diff);
+    // Or both tasks are contested, but the current task is more contested.
+    // Either way, the current task loses.
+    return false;
+  }
+
+  if (bid_diff == winning_bid_diff) {
+    // Either both tasks are contested (finite bid_diff/winning_bid_diff) and equally contentious;
+    // Or both tasks are uncontested (infinite bid_diff/winning_bid_diff).
+    // Either way, the lowest bid wins.
+    if (winning_bid <= min_bid) {
+      // Current task doesn't have a lower bid and loses.
+      return false;
+    }
+  }
+
+  return true;
 }
 
 // Adds the winning task to the winning robots path, and removes the task from
@@ -315,14 +379,15 @@ void SequentialAuction::printPath(vector<int> path)
 void SequentialAuction::printBids()
 {
   std::stringstream ss;
-  ss << std::setw(8) << std::setprecision(1) << std::fixed;
+  ss << std::setprecision(1) << std::fixed;
   for (int i = 0; i < num_robots; i++)
   {
     for (int j = 0; j < num_tasks; j++)
     {
-      ss << bids[i][j] << " ";
+      ss << std::setw(10) << bids[i][j] << " ";
     }
-    cout << endl;
+    ss << endl;
   }
   ROS_DEBUG_STREAM(ss.str());
+  cout << ss.str();
 }

@@ -49,6 +49,7 @@ private:
   void formOutput();
   void processWinner(int winning_robot, int winning_task);
   void selectWinner(int& winning_robot, int& winning_task);
+  void selectLeastContestedWinner(int& winning_robot, int& winning_task);
   void prepareAllocations();
   void calculateAllBids();
   void calculateBids(int robot_num);
