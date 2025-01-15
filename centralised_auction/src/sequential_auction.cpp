@@ -38,15 +38,53 @@ vector<TaskArray> SequentialAuction::allocateTasks()
   int winning_robot, winning_task;
   prepareAllocations();
   calculateAllBids();
+  cout << "The starting bids are: " << endl;
+  cout << bid_mat_ << std::endl;
   while (!unalloc.empty())
   {
+
+    Eigen::Index row, col;
+    bid_mat_.maxCoeff(&row, &col);
     cout << "The bids are: " << endl;
-    printBids();
-    selectWinner(winning_robot, winning_task);
-    cout << "winner is: " << winning_robot << ", " << winning_task << endl;
-    processWinner(winning_robot, winning_task);
-    calculateBids(winning_robot);
+    cout << bid_mat_ << std::endl;
+    Eigen::VectorXd tmp_col = bid_mat_.col(col);
+    std::vector<double> colv{tmp_col.data(), tmp_col.data() + tmp_col.size()};
+    std::sort(colv.begin(),colv.end());
+    int last_task = std::max(num_tasks-2, 0);
+    Eigen::VectorXd tmp_row = bid_mat_.row(row);
+    std::vector<double> rowv{tmp_row.data(), tmp_row.data() + tmp_row.size()};
+    std::sort(rowv.begin(),rowv.end());
+    int last_robot = std::max(num_robots-2, 0);
+    if(colv[last_task] < 0)
+    {
+        // no tasks remaining, assign this robot
+        int dummy, winner;
+        bid_mat_.col(col).maxCoeff(&winner, &dummy);
+        cout << "winner is " << winner << " for task " << col << std::endl;
+        processWinner(winner, col);
+        cout << "selected winner, new bids are: " << endl;
+        cout << bid_mat_ << std::endl;
+    } else if (rowv[last_robot] < 0)
+    {
+        // no tasks remaining, assign this robot
+        int dummy, winner;
+        bid_mat_.row(row).maxCoeff(&winner, &dummy);
+        cout << "winner is " << winner << " for task " << col << std::endl;
+        processWinner(winner, col);
+        cout << "selected winner, new bids are: " << endl;
+        cout << bid_mat_ << std::endl;
+    }
+    else
+    {
+      bid_mat_(row, col) = -1;
+    }
+
   }
+    // selectWinner(winning_robot, winning_task);
+    // cout << "winner is: " << winning_robot << ", " << winning_task << endl;
+    // processWinner(winning_robot, winning_task);
+    // calculateBids(winning_robot);
+  // }
   cout << "Allocations: " << endl;
   printPaths();
 
@@ -66,6 +104,8 @@ void SequentialAuction::prepareAllocations()
   path_costs.clear();
   bids.clear();
   allocations.clear();
+  bid_mat_ = Eigen::MatrixXd::Constant(num_robots, num_tasks,-1.0);
+
   for (int i = 0; i < num_tasks; i++)
   {
     unalloc.push_back(i);
@@ -120,6 +160,7 @@ void SequentialAuction::calculateBids(int robot_num)
     double new_cost = insertTask(robot_num, task_num, new_path);
     // Bid the new path cost.
     bids[robot_num][task_num] = new_cost;
+    bid_mat_(robot_num,task_num) = new_cost;
   }
 }
 
@@ -149,6 +190,41 @@ void SequentialAuction::selectWinner(int& winning_robot, int& winning_task)
         }
       }
     }
+
+    // int row, col;
+
+    // while(true)
+    // {
+      
+
+    // }
+
+    //   for(auto i : bid_mat_.col(col))
+    //   {
+    //     std::sort()
+    //   }
+    //   if (bid_mat_.col(col).sum() == num_tasks*-1)
+    //   {
+    //     // we ran out of tasks, need to assign this one 
+
+    //   }
+    //   if (bid_mat_.row(row) == Eigen::Vectord(num_tasks, -1))
+    //   {
+
+    //   }
+
+    // }
+    // // we want the allocation that minimizes overall movement
+    // for (int task=0; task<num_tasks; task++)
+    // {
+    //   for (int robot=0; robot<num_robots; robot++)
+    //   {
+    //     // 
+
+    //   }
+
+    // }
+
   }
 
   ROS_FATAL_COND(winning_robot == -1 || winning_task == -1, "No winner found.");
@@ -257,8 +333,15 @@ void SequentialAuction::processWinner(int winning_robot, int winning_task)
   }
   for (int i = 0; i < num_robots; i++)
   {
+    bid_mat_(i, winning_task) = -1;
     bids[i][winning_task] = -1;
   }
+
+  for(int i=0; i<num_tasks; i++)
+  {
+    bid_mat_(winning_robot, i) = -1;
+  }
+
   for (int i = 0; i < unalloc.size(); i++)
   {
     if (unalloc[i] == winning_task)

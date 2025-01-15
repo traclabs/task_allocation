@@ -8,6 +8,7 @@
 #include "task_msgs/Task.h"
 #include "task_msgs/TaskArray.h"
 #include "geometry_msgs/Pose.h"
+#include <Eigen/Dense>
 
 using geometry_msgs::Pose;
 using std::cout;
@@ -42,6 +43,7 @@ private:
   vector<vector<int>> paths;  // consider changing to lists for efficiency
   vector<double> path_costs;
   vector<vector<double>> bids;
+  Eigen::MatrixXd bid_mat_;
 
   // Output variable from allocation.
   vector<TaskArray> allocations;
