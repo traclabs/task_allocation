@@ -1,8 +1,16 @@
 #include <cmath>
 #include <sstream>
+
+#include <rcpputils/asserts.hpp>
+
 #include "centralised_auction/sequential_auction.h"
 
 static bool isTaskLessContentious(double min_bid, double bid_diff, double winning_bid, double winning_bid_diff);
+
+namespace
+{
+const auto LOGGER = rclcpp::get_logger("centralized_auction.sequential_action");
+}
 
 /********************************************
  * Public functions (high level).
@@ -19,13 +27,13 @@ SequentialAuction::SequentialAuction(vector<Task> unallocated_tasks, vector<Pose
   this->feasible_tasks = feasible_tasks;
   if (feasible_tasks.empty())
   {
-    ROS_INFO("Feasible task set not provided. Assuming all tasks are feasible for all robots.");
+    RCLCPP_INFO(LOGGER, "Feasible task set not provided. Assuming all tasks are feasible for all robots.");
   }
   else
   {
-    ROS_ASSERT_MSG(robot_poses.size() == feasible_tasks.size(),
-                   "%zu feasible task sets were provided. Expected %zu, one for each robot.", feasible_tasks.size(),
-                   robot_poses.size());
+    rcpputils::assert_true(robot_poses.size() == feasible_tasks.size(),
+                           std::to_string(feasible_tasks.size()) + " feasible task sets were provided. Expected " +
+                               std::to_string(robot_poses.size()) + ", one for each robot.");
   }
   return_home = false;
   use_least_contested_bid = true;
@@ -106,7 +114,7 @@ void SequentialAuction::calculateBids(int robot_num)
       bool current_robot_can_do_current_task = feasible_tasks.at(robot_num).count(task_num);
       if (!current_robot_can_do_current_task)
       {
-        ROS_DEBUG("Robot %i cannot do task %i; Bidding invalid amount.", robot_num, task_num);
+        RCLCPP_DEBUG(LOGGER, "Robot %i cannot do task %i; Bidding invalid amount.", robot_num, task_num);
         bids[robot_num][task_num] = -1;
         continue;
       }
@@ -133,7 +141,9 @@ void SequentialAuction::selectWinner(int& winning_robot, int& winning_task)
   if (use_least_contested_bid && num_robots > 1)
   {
     selectLeastContestedWinner(winning_robot, winning_task);
-  } else {
+  }
+  else
+  {
     // Option (default) - winner is the lowest bid.
     double min_bid = -1;
     for (int i = 0; i < num_robots; i++)
@@ -151,47 +161,56 @@ void SequentialAuction::selectWinner(int& winning_robot, int& winning_task)
     }
   }
 
-  ROS_FATAL_COND(winning_robot == -1 || winning_task == -1, "No winner found.");
+  if (winning_robot == -1 || winning_task == -1)
+    RCLCPP_FATAL(LOGGER, "No winner found.");
 }
 
 void SequentialAuction::selectLeastContestedWinner(int& winning_robot, int& winning_task)
 {
   static constexpr double INF = std::numeric_limits<double>::infinity();
 
-  ROS_ASSERT(winning_robot == -1);
-  ROS_ASSERT(winning_task == -1);
-  ROS_ASSERT(use_least_contested_bid);
+  rcpputils::assert_true(winning_robot == -1);
+  rcpputils::assert_true(winning_task == -1);
+  rcpputils::assert_true(use_least_contested_bid);
 
   double winning_bid = INF;
   double winning_bid_diff = 0;
 
-  for (int task : unalloc) {
-    // For the current task, figure out which robot would win the task, with what bid, and by how much vs next lowest bid.
+  for (int task : unalloc)
+  {
+    // For the current task, figure out which robot would win the task, with what bid, and by how much vs next lowest
+    // bid.
     int task_winning_robot = -1;
     double min_bid = INF;
     // The most contentious bid is the closest bid to the minimum bid; ie the second lowest bid.
     double most_contentious_bid = INF;
 
     // Look through the robots to find the one that wins this task.
-    for (int robot = 0; robot < num_robots; robot++) {
+    for (int robot = 0; robot < num_robots; robot++)
+    {
       bool current_robot_can_do_current_task = feasible_tasks.empty() || feasible_tasks.at(robot).count(task);
-      if (!current_robot_can_do_current_task) {
+      if (!current_robot_can_do_current_task)
+      {
         continue;
       }
 
       double bid = bids[robot][task];
-      if ( bid == -1 ) {
+      if (bid == -1)
+      {
         continue;
       }
 
-      ROS_ASSERT( bid >= 0 );
-      ROS_ASSERT( bid < INF );
+      rcpputils::assert_true(bid >= 0);
+      rcpputils::assert_true(bid < INF);
 
-      if (bid < min_bid) {
+      if (bid < min_bid)
+      {
         most_contentious_bid = min_bid;
         min_bid = bid;
         task_winning_robot = robot;
-      } else if (bid < most_contentious_bid) {
+      }
+      else if (bid < most_contentious_bid)
+      {
         most_contentious_bid = bid;
       }
     }
@@ -203,14 +222,16 @@ void SequentialAuction::selectLeastContestedWinner(int& winning_robot, int& winn
     // 3. Otherwise, pick the uncontested task over the contested one.
 
     // 0. Reject the task if it has no valid bids.
-    if ( min_bid == INF || task_winning_robot == -1 ) {
-      ROS_WARN("Task %i has no valid bids.", task);
+    if (min_bid == INF || task_winning_robot == -1)
+    {
+      RCLCPP_WARN(LOGGER, "Task %i has no valid bids.", task);
       continue;
     }
 
-    double bid_diff = most_contentious_bid - min_bid; // INF for uncontested tasks.
-    if (isTaskLessContentious(min_bid, bid_diff, winning_bid, winning_bid_diff)) {
-      ROS_ASSERT(bid_diff >= winning_bid_diff);
+    double bid_diff = most_contentious_bid - min_bid;  // INF for uncontested tasks.
+    if (isTaskLessContentious(min_bid, bid_diff, winning_bid, winning_bid_diff))
+    {
+      rcpputils::assert_true(bid_diff >= winning_bid_diff);
       winning_robot = task_winning_robot;
       winning_task = task;
       winning_bid = min_bid;
@@ -219,19 +240,23 @@ void SequentialAuction::selectLeastContestedWinner(int& winning_robot, int& winn
   }
 }
 
-static bool isTaskLessContentious(double min_bid, double bid_diff, double winning_bid, double winning_bid_diff) {
-  if (bid_diff < winning_bid_diff) {
-    // Either the winning task is uncontested (infinite winning_bid_diff) and the current task is contested (finite bid_diff);
-    // Or both tasks are contested, but the current task is more contested.
-    // Either way, the current task loses.
+static bool isTaskLessContentious(double min_bid, double bid_diff, double winning_bid, double winning_bid_diff)
+{
+  if (bid_diff < winning_bid_diff)
+  {
+    // Either the winning task is uncontested (infinite winning_bid_diff) and the current task is contested (finite
+    // bid_diff); Or both tasks are contested, but the current task is more contested. Either way, the current task
+    // loses.
     return false;
   }
 
-  if (bid_diff == winning_bid_diff) {
+  if (bid_diff == winning_bid_diff)
+  {
     // Either both tasks are contested (finite bid_diff/winning_bid_diff) and equally contentious;
     // Or both tasks are uncontested (infinite bid_diff/winning_bid_diff).
     // Either way, the lowest bid wins.
-    if (winning_bid <= min_bid) {
+    if (winning_bid <= min_bid)
+    {
       // Current task doesn't have a lower bid and loses.
       return false;
     }
@@ -251,7 +276,7 @@ void SequentialAuction::processWinner(int winning_robot, int winning_task)
     // As such, clear out its feasible tasks.
     // TODO: Generalize to something more sophisticated like
     // selectively removing only tasks which are mutually exclusive with the winning_task.
-    ROS_DEBUG("Clearing feasible tasks for robot %i after winning task %i.", winning_robot, winning_task);
+    RCLCPP_DEBUG(LOGGER, "Clearing feasible tasks for robot %i after winning task %i.", winning_robot, winning_task);
     //
     feasible_tasks.at(winning_robot).clear();
   }
@@ -373,7 +398,7 @@ void SequentialAuction::printPath(vector<int> path)
     ss << path[i] << " ";
   }
   ss << "]";
-  ROS_DEBUG_STREAM(ss.str());
+  RCLCPP_DEBUG_STREAM(LOGGER, ss.str());
 }
 
 void SequentialAuction::printBids()
@@ -388,6 +413,6 @@ void SequentialAuction::printBids()
     }
     ss << endl;
   }
-  ROS_DEBUG_STREAM(ss.str());
+  RCLCPP_DEBUG_STREAM(LOGGER, ss.str());
   cout << ss.str();
 }

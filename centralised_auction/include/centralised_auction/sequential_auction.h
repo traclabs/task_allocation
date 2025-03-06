@@ -1,21 +1,20 @@
 #ifndef SEQUENTIAL_AUCTION_H
 #define SEQUENTIAL_AUCTION_H
 
-#include <ros/ros.h>
-#include <ros/console.h>
+#include <rclcpp/rclcpp.hpp>
 #include <set>
 #include <vector>
-#include "task_msgs/Task.h"
-#include "task_msgs/TaskArray.h"
-#include "geometry_msgs/Pose.h"
+#include <task_msgs/msg/task.hpp>
+#include <task_msgs/msg/task_array.hpp>
+#include <geometry_msgs/msg/pose.hpp>
 
-using geometry_msgs::Pose;
+using geometry_msgs::msg::Pose;
 using std::cout;
 using std::endl;
 using std::set;
 using std::vector;
-using task_msgs::Task;
-using task_msgs::TaskArray;
+using task_msgs::msg::Task;
+using task_msgs::msg::TaskArray;
 
 class SequentialAuction
 {
