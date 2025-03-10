@@ -15,7 +15,7 @@ find_package(task_msgs REQUIRED)
 include_directories(include)
 
 # Declare a C++ library
-add_library(${PROJECT_NAME} src/sequential_auction.cpp)
+add_library(${PROJECT_NAME} SHARED src/sequential_auction.cpp)
 ament_target_dependencies(${PROJECT_NAME} geometry_msgs rclcpp rcpputils task_msgs)
 
 # Install
