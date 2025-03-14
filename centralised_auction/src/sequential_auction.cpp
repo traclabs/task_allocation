@@ -1,5 +1,6 @@
 #include <cmath>
 #include <sstream>
+#include <optional>
 #include "centralised_auction/sequential_auction.h"
 
 static bool isTaskLessContentious(double min_bid, double bid_diff, double winning_bid, double winning_bid_diff);
@@ -38,15 +39,55 @@ vector<TaskArray> SequentialAuction::allocateTasks()
   int winning_robot, winning_task;
   prepareAllocations();
   calculateAllBids();
+  cout << "The starting bids are: " << endl;
+  cout << bid_mat_ << std::endl;
   while (!unalloc.empty())
   {
-    cout << "The bids are: " << endl;
-    printBids();
-    selectWinner(winning_robot, winning_task);
-    cout << "winner is: " << winning_robot << ", " << winning_task << endl;
-    processWinner(winning_robot, winning_task);
-    calculateBids(winning_robot);
+    // Lambda function to find a unique index where a row or column has exactly one valid bid
+    auto findUniqueIndex = [](const Eigen::VectorXd& vec) -> std::optional<int> {
+      int count = 0, index = -1;
+      for (int i = 0; i < vec.size(); i++)
+      {
+        if (vec[i] >= 0)
+        {
+          if (++count > 1)
+            return std::nullopt;  // More than one valid entry, not unique
+          index = i;
+        }
+      }
+      return (count == 1) ? std::optional<int>(index) : std::nullopt;
+    };
+
+    // Check for robots with only one valid task
+    for (int robot = 0; robot < num_robots; robot++)
+    {
+      if (auto task = findUniqueIndex(bid_mat_.row(robot)))
+      {
+        processWinner(robot, *task);
+        std::cout << "Assigned task " << *task << " to robot " << robot << std::endl;
+        std::cout << bid_mat_ << std::endl;
+      }
+    }
+
+    // Check for tasks with only one valid robot
+    for (int task = 0; task < num_tasks; task++)
+    {
+      if (auto robot = findUniqueIndex(bid_mat_.col(task)))
+      {
+        processWinner(*robot, task);
+        std::cout << "Assigned task " << task << " to robot " << *robot << std::endl;
+        std::cout << bid_mat_ << std::endl;
+      }
+    }
+
+    // Remove highest bid allocation
+    Eigen::Index row, col;
+    bid_mat_.maxCoeff(&row, &col);
+    bid_mat_(row, col) = -1;
+    std::cout << "Removed highest bid allocation at (" << row << ", " << col << ")" << std::endl;
+    std::cout << bid_mat_ << std::endl;
   }
+
   cout << "Allocations: " << endl;
   printPaths();
 
@@ -66,6 +107,8 @@ void SequentialAuction::prepareAllocations()
   path_costs.clear();
   bids.clear();
   allocations.clear();
+  bid_mat_ = Eigen::MatrixXd::Constant(num_robots, num_tasks,-1.0);
+
   for (int i = 0; i < num_tasks; i++)
   {
     unalloc.push_back(i);
@@ -120,6 +163,7 @@ void SequentialAuction::calculateBids(int robot_num)
     double new_cost = insertTask(robot_num, task_num, new_path);
     // Bid the new path cost.
     bids[robot_num][task_num] = new_cost;
+    bid_mat_(robot_num,task_num) = new_cost;
   }
 }
 
@@ -257,8 +301,15 @@ void SequentialAuction::processWinner(int winning_robot, int winning_task)
   }
   for (int i = 0; i < num_robots; i++)
   {
+    bid_mat_(i, winning_task) = -1;
     bids[i][winning_task] = -1;
   }
+
+  for(int i=0; i < num_tasks; i++)
+  {
+    bid_mat_(winning_robot, i) = -1;
+  }
+
   for (int i = 0; i < unalloc.size(); i++)
   {
     if (unalloc[i] == winning_task)
