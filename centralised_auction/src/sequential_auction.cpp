@@ -48,10 +48,10 @@ vector<TaskArray> SequentialAuction::allocateTasks()
   calculateAllBids();
   while (!unalloc.empty())
   {
-    cout << "The bids are: " << endl;
+    // cout << "The bids are: " << endl;
     printBids();
     selectWinner(winning_robot, winning_task);
-    cout << "winner is: " << winning_robot << ", " << winning_task << endl;
+    // cout << "winner is: " << winning_robot << ", " << winning_task << endl;
     processWinner(winning_robot, winning_task);
     calculateBids(winning_robot);
   }
