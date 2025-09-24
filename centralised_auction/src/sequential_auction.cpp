@@ -106,7 +106,7 @@ void SequentialAuction::calculateAllBids()
 // Populates the bidding matrix with bids for the currently unallocated tasks.
 void SequentialAuction::calculateBids(int robot_num)
 {
-  for (int i = 0; i < unalloc.size(); i++)
+  for (std::size_t i = 0; i < unalloc.size(); i++)
   {
     int task_num = unalloc[i];
     if (!feasible_tasks.empty())
@@ -120,9 +120,6 @@ void SequentialAuction::calculateBids(int robot_num)
       }
     }
 
-    // cout << "task " << unalloc[i] << endl;
-    // Get the current path cost.
-    double prev_cost = path_costs[robot_num];
     // Calculate the new path cost if we were to add the task to the path.
     vector<int> new_path;
     double new_cost = insertTask(robot_num, task_num, new_path);
@@ -284,7 +281,7 @@ void SequentialAuction::processWinner(int winning_robot, int winning_task)
   {
     bids[i][winning_task] = -1;
   }
-  for (int i = 0; i < unalloc.size(); i++)
+  for (std::size_t i = 0; i < unalloc.size(); i++)
   {
     if (unalloc[i] == winning_task)
     {
@@ -302,7 +299,7 @@ void SequentialAuction::formOutput()
   {
     TaskArray ta;
     vector<int> path = paths[i];
-    for (int j = 0; j < path.size(); j++)
+    for (std::size_t j = 0; j < path.size(); j++)
     {
       int id = path[j];
       ta.array.push_back(tasks[id]);
@@ -323,7 +320,7 @@ double SequentialAuction::insertTask(int robot_num, int unalloc_id, vector<int>&
   double path_cost;
   vector<int> best_path;
   double best_path_cost = -1;
-  for (int i = 0; i <= path.size(); i++)
+  for (std::size_t i = 0; i <= path.size(); i++)
   {
     path.insert(path.begin() + i, unalloc_id);
     // printPath( path );
@@ -351,7 +348,7 @@ double SequentialAuction::calculatePathCost(int robot_num, vector<int> path)
   x_prev = robot_poses[robot_num].position.x;
   y_prev = robot_poses[robot_num].position.y;
   z_prev = robot_poses[robot_num].position.z;
-  for (int i = 0; i < path.size(); i++)
+  for (std::size_t i = 0; i < path.size(); i++)
   {
     task_id = path[i];
     x_next = tasks[task_id].pose.position.x;
@@ -393,7 +390,7 @@ void SequentialAuction::printPath(vector<int> path)
 {
   std::stringstream ss;
   ss << "[ ";
-  for (int i = 0; i < path.size(); i++)
+  for (std::size_t i = 0; i < path.size(); i++)
   {
     ss << path[i] << " ";
   }
